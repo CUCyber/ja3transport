@@ -1,6 +1,7 @@
 # JA3Transport
 
 [![GoDoc](https://godoc.org/github.com/CUCyber/ja3transport?status.svg)](https://godoc.org/github.com/CUCyber/ja3transport)
+[![Go Report Card](https://goreportcard.com/badge/github.com/CUCyber/ja3transport)](https://goreportcard.com/report/github.com/CUCyber/ja3transport)
 
 For a more in-depth look at the library, check out our [blogpost].
 
