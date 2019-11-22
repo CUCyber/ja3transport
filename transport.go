@@ -16,6 +16,7 @@ import (
 // random RFC.
 const greasePlaceholder = 0x0a0a
 
+// ErrExtensionNotExist is returned when an extension is not supported by the library
 func ErrExtensionNotExist(e string) error {
 	return fmt.Errorf("Extension does not exist: %v\n", e)
 }
