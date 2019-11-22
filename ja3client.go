@@ -1,7 +1,6 @@
 package ja3client
 
 import (
-	"bufio"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -10,10 +9,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	tls "github.com/refraction-networking/utls"
-	"golang.org/x/net/http2"
 )
 
 // GreasePlaceholder is a random value (well, kindof '0x?a?a) specified in a
@@ -75,21 +72,10 @@ var extMap = map[string]tls.TLSExtension{
 
 // JA3Client contains is similar to http.Client
 type JA3Client struct {
-	Config  *tls.Config
-	Timeout time.Duration
-	Browser Browser
-	Spec    *tls.ClientHelloSpec
-}
+	*http.Client
 
-func urlToHost(target *url.URL) *url.URL {
-	if !strings.Contains(target.Host, ":") {
-		if target.Scheme == "http" {
-			target.Host = target.Host + ":80"
-		} else if target.Schema == "https" {
-			target.Host = target.Host + ":443"
-		}
-	}
-	return target
+	Config  *tls.Config
+	Browser Browser
 }
 
 func ErrExtensionNotExist(e string) error {
@@ -108,17 +94,106 @@ func New(b Browser) (*JA3Client, error) {
 
 // NewWithString creates a JA3 client with the specified JA3 string
 func NewWithString(ja3 string) (*JA3Client, error) {
+	tr, err := NewTransport(ja3)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{Transport: tr}
+
+	return &JA3Client{
+		client,
+		&tls.Config{},
+		Browser{JA3: ja3},
+	}, nil
+}
+
+// NewTransport creates an http.Transport which mocks the given JA3 signature when HTTPS is used
+func NewTransport(ja3 string) (*http.Transport, error) {
+	return NewTransportWithConfig(ja3, &tls.Config{})
+}
+
+// NewTransportWithConfig creates an http.Transport object given a utls.Config
+func NewTransportWithConfig(ja3 string, config *tls.Config) (*http.Transport, error) {
 	spec, err := stringToSpec(ja3)
 	if err != nil {
 		return nil, err
 	}
 
-	return &JA3Client{
-		Spec:    spec,
-		Timeout: time.Duration(15) * time.Second,
-		Config:  &tls.Config{},
-		Browser: Browser{JA3: ja3},
-	}, nil
+	dialtls := func(network, addr string) (net.Conn, error) {
+		dialConn, err := net.Dial(network, addr)
+		if err != nil {
+			return nil, err
+		}
+
+		config.ServerName = strings.Split(addr, ":")[0]
+
+		uTlsConn := tls.UClient(dialConn, config, tls.HelloCustom)
+		if err := uTlsConn.ApplyPreset(spec); err != nil {
+			return nil, err
+		}
+		if err := uTlsConn.Handshake(); err != nil {
+			return nil, err
+		}
+		return uTlsConn, nil
+	}
+
+	return &http.Transport{DialTLS: dialtls}, nil
+}
+
+// Do sends an HTTP request and returns an HTTP response, following policy
+// (such as redirects, cookies, auth) as configured on the client.
+func (c *JA3Client) Do(req *http.Request) (*http.Response, error) {
+	if _, ok := req.Header["User-Agent"]; !ok && c.Browser.UserAgent != "" {
+		req.Header.Set("User-Agent", c.Browser.UserAgent)
+	}
+
+	return c.Client.Do(req)
+}
+
+// Get issues a GET to the specified URL.
+func (c *JA3Client) Get(targetURL string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", targetURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.Do(req)
+}
+
+// Post issues a POST to the specified URL.
+func (c *JA3Client) Post(url, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequest("POST", url, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", contentType)
+	return c.Do(req)
+}
+
+// Head issues a HEAD to the specified URL.
+func (c *JA3Client) Head(url string) (resp *http.Response, err error) {
+	req, err := http.NewRequest("HEAD", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.Do(req)
+}
+
+// PostForm issues a POST to the specified URL,
+// with data's keys and values URL-encoded as the request body.
+func (c *JA3Client) PostForm(url string, data url.Values) (resp *http.Response, err error) {
+	return c.Post(url, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+}
+
+func urlToHost(target *url.URL) *url.URL {
+	if !strings.Contains(target.Host, ":") {
+		if target.Scheme == "http" {
+			target.Host = target.Host + ":80"
+		} else if target.Scheme == "https" {
+			target.Host = target.Host + ":443"
+		}
+	}
+	return target
 }
 
 // stringToSpec creates a ClientHelloSpec based on a JA3 string
@@ -194,97 +269,4 @@ func stringToSpec(ja3 string) (*tls.ClientHelloSpec, error) {
 		Extensions:         exts,
 		GetSessionID:       sha256.Sum256,
 	}, nil
-}
-
-// Do sends an HTTP request and returns an HTTP response, following policy
-// (such as redirects, cookies, auth) as configured on the client.
-func (c *JA3Client) Do(req *http.Request) (*http.Response, error) {
-	if _, ok := req.Header["User-Agent"]; !ok && c.Browser.UserAgent != "" {
-		req.Header.Set("User-Agent", c.Browser.UserAgent)
-	}
-
-	if req.URL.Scheme == "http" {
-		return http.DefaultClient.Do(req)
-	}
-
-	target = urlToHost(req.URL)
-	hostname := strings.Split(target.Host, ":")[0]
-
-	if c.Config.ServerName == "" {
-		c.Config.ServerName = hostname
-	}
-
-	dialConn, err := net.DialTimeout("tcp", target.Host, c.Timeout)
-	if err != nil {
-		return nil, err
-	}
-	uTlsConn := tls.UClient(dialConn, c.Config, tls.HelloCustom)
-	defer uTlsConn.Close()
-
-	if err := uTlsConn.ApplyPreset(c.Spec); err != nil {
-		return nil, err
-	}
-
-	if err := uTlsConn.Handshake(); err != nil {
-		return nil, err
-	}
-
-	switch uTlsConn.HandshakeState.ServerHello.AlpnProtocol {
-	case "h2":
-		req.Proto = "HTTP/2.0"
-		req.ProtoMajor = 2
-		req.ProtoMinor = 0
-
-		tr := http2.Transport{}
-		cConn, err := tr.NewClientConn(uTlsConn)
-		if err != nil {
-			return nil, err
-		}
-		return cConn.RoundTrip(req)
-	case "http/1.1", "":
-		req.Proto = "HTTP/1.1"
-		req.ProtoMajor = 1
-		req.ProtoMinor = 1
-
-		if err := req.Write(uTlsConn); err != nil {
-			return nil, err
-		}
-		return http.ReadResponse(bufio.NewReader(uTlsConn), req)
-	default:
-		return nil, err
-	}
-}
-
-// Get issues a GET to the specified URL.
-func (c *JA3Client) Get(targetURL string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", targetURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	return c.Do(req)
-}
-
-// Post issues a POST to the specified URL.
-func (c *JA3Client) Post(url, contentType string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest("POST", url, body)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", contentType)
-	return c.Do(req)
-}
-
-// Head issues a HEAD to the specified URL.
-func (c *JA3Client) Head(url string) (resp *http.Response, err error) {
-	req, err := http.NewRequest("HEAD", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	return c.Do(req)
-}
-
-// PostForm issues a POST to the specified URL,
-// with data's keys and values URL-encoded as the request body.
-func (c *JA3Client) PostForm(url string, data url.Values) (resp *http.Response, err error) {
-	return c.Post(url, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 }
