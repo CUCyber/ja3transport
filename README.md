@@ -1,6 +1,6 @@
 # JA3Transport
 
-[![GoDoc](https://godoc.org/github.com/CUCyber/ja3client?status.svg)](https://godoc.org/github.com/CUCyber/ja3client)
+[![GoDoc](https://godoc.org/github.com/CUCyber/ja3transport?status.svg)](https://godoc.org/github.com/CUCyber/ja3transport)
 
 For a more in-depth look at the library, check out our [blogpost].
 
