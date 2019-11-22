@@ -6,7 +6,11 @@ type Browser struct {
 	UserAgent string
 }
 
-// ChromeAuto mocks
+// ChromeAuto mocks Chrome 78
+var ChromeAuto = Browser{
+	JA3:       "769,47–53–5–10–49161–49162–49171–49172–50–56–19–4,0–10–11,23–24–25,0",
+	UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36",
+}
 
 // SafariAuto mocks Safari 604.1
 var SafariAuto = Browser{
