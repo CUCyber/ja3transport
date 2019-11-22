@@ -1,4 +1,4 @@
-# JA3Client
+# JA3Transport
 
 [![GoDoc](https://godoc.org/github.com/CUCyber/ja3client?status.svg)](https://godoc.org/github.com/CUCyber/ja3client)
 
