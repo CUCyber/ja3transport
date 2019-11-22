@@ -1,4 +1,4 @@
-package ja3client_test
+package ja3transport_test
 
 import (
 	"fmt"

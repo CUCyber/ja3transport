@@ -1,4 +1,4 @@
-package ja3client
+package ja3transport
 
 type Browser struct {
 	JA3       string
