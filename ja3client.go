@@ -3,7 +3,6 @@ package ja3client
 import (
 	"bufio"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -79,13 +78,16 @@ type JA3Client struct {
 	Config  *tls.Config
 	Timeout time.Duration
 	Browser Browser
-
-	spec *tls.ClientHelloSpec
+	Spec    *tls.ClientHelloSpec
 }
 
 func urlToHost(target *url.URL) *url.URL {
 	if !strings.Contains(target.Host, ":") {
-		target.Host = target.Host + ":443"
+		if target.Scheme == "http" {
+			target.Host = target.Host + ":80"
+		} else if target.Schema == "https" {
+			target.Host = target.Host + ":443"
+		}
 	}
 	return target
 }
@@ -93,8 +95,6 @@ func urlToHost(target *url.URL) *url.URL {
 func ErrExtensionNotExist(e string) error {
 	return fmt.Errorf("Extension does not exist: %v\n", e)
 }
-
-var ErrNotValid = errors.New("Invalid")
 
 // New creates a JA3Client based on a Browser struct
 func New(b Browser) (*JA3Client, error) {
@@ -114,7 +114,7 @@ func NewWithString(ja3 string) (*JA3Client, error) {
 	}
 
 	return &JA3Client{
-		spec:    spec,
+		Spec:    spec,
 		Timeout: time.Duration(15) * time.Second,
 		Config:  &tls.Config{},
 		Browser: Browser{JA3: ja3},
@@ -128,12 +128,10 @@ func stringToSpec(ja3 string) (*tls.ClientHelloSpec, error) {
 	version := tokens[0]
 	ciphers := strings.Split(tokens[1], "-")
 	extensions := strings.Split(tokens[2], "-")
-
 	curves := strings.Split(tokens[3], "-")
 	if len(curves) == 1 && curves[0] == "" {
 		curves = []string{}
 	}
-
 	pointFormats := strings.Split(tokens[4], "-")
 	if len(pointFormats) == 1 && pointFormats[0] == "" {
 		pointFormats = []string{}
@@ -144,7 +142,7 @@ func stringToSpec(ja3 string) (*tls.ClientHelloSpec, error) {
 	for _, c := range curves {
 		cid, err := strconv.ParseUint(c, 10, 16)
 		if err != nil {
-			return nil, ErrNotValid
+			return nil, err
 		}
 		targetCurves = append(targetCurves, tls.CurveID(cid))
 	}
@@ -155,7 +153,7 @@ func stringToSpec(ja3 string) (*tls.ClientHelloSpec, error) {
 	for _, p := range pointFormats {
 		pid, err := strconv.ParseUint(p, 10, 8)
 		if err != nil {
-			return nil, ErrNotValid
+			return nil, err
 		}
 		targetPointFormats = append(targetPointFormats, byte(pid))
 	}
@@ -174,7 +172,7 @@ func stringToSpec(ja3 string) (*tls.ClientHelloSpec, error) {
 	// build SSLVersion
 	vid64, err := strconv.ParseUint(version, 10, 16)
 	if err != nil {
-		return nil, ErrNotValid
+		return nil, err
 	}
 	vid := uint16(vid64)
 
@@ -183,7 +181,7 @@ func stringToSpec(ja3 string) (*tls.ClientHelloSpec, error) {
 	for _, c := range ciphers {
 		cid, err := strconv.ParseUint(c, 10, 16)
 		if err != nil {
-			return nil, ErrNotValid
+			return nil, err
 		}
 		suites = append(suites, uint16(cid))
 	}
@@ -201,16 +199,19 @@ func stringToSpec(ja3 string) (*tls.ClientHelloSpec, error) {
 // Do sends an HTTP request and returns an HTTP response, following policy
 // (such as redirects, cookies, auth) as configured on the client.
 func (c *JA3Client) Do(req *http.Request) (*http.Response, error) {
-	target := req.URL
-	target = urlToHost(target)
+	if _, ok := req.Header["User-Agent"]; !ok && c.Browser.UserAgent != "" {
+		req.Header.Set("User-Agent", c.Browser.UserAgent)
+	}
+
+	if req.URL.Scheme == "http" {
+		return http.DefaultClient.Do(req)
+	}
+
+	target = urlToHost(req.URL)
 	hostname := strings.Split(target.Host, ":")[0]
 
 	if c.Config.ServerName == "" {
 		c.Config.ServerName = hostname
-	}
-
-	if c.Browser.UserAgent != "" {
-		req.Header.Set("User-Agent", c.Browser.UserAgent)
 	}
 
 	dialConn, err := net.DialTimeout("tcp", target.Host, c.Timeout)
@@ -220,14 +221,11 @@ func (c *JA3Client) Do(req *http.Request) (*http.Response, error) {
 	uTlsConn := tls.UClient(dialConn, c.Config, tls.HelloCustom)
 	defer uTlsConn.Close()
 
-	if c.spec != nil {
-		if err := uTlsConn.ApplyPreset(c.spec); err != nil {
-			return nil, err
-		}
+	if err := uTlsConn.ApplyPreset(c.Spec); err != nil {
+		return nil, err
 	}
 
-	err = uTlsConn.Handshake()
-	if err != nil {
+	if err := uTlsConn.Handshake(); err != nil {
 		return nil, err
 	}
 
@@ -248,8 +246,7 @@ func (c *JA3Client) Do(req *http.Request) (*http.Response, error) {
 		req.ProtoMajor = 1
 		req.ProtoMinor = 1
 
-		err := req.Write(uTlsConn)
-		if err != nil {
+		if err := req.Write(uTlsConn); err != nil {
 			return nil, err
 		}
 		return http.ReadResponse(bufio.NewReader(uTlsConn), req)
