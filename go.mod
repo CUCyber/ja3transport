@@ -1,4 +1,4 @@
-module github.com/CUCyber/ja3client
+module github.com/CUCyber/ja3transport
 
 go 1.13
 
