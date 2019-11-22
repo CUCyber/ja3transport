@@ -12,9 +12,9 @@ import (
 	tls "github.com/refraction-networking/utls"
 )
 
-// GreasePlaceholder is a random value (well, kindof '0x?a?a) specified in a
+// greasePlaceholder is a random value (well, kindof '0x?a?a) specified in a
 // random RFC.
-const GreasePlaceholder = 0x0a0a
+const greasePlaceholder = 0x0a0a
 
 func ErrExtensionNotExist(e string) error {
 	return fmt.Errorf("Extension does not exist: %v\n", e)
@@ -64,7 +64,7 @@ var extMap = map[string]tls.TLSExtension{
 		tls.PskModeDHE,
 	}},
 	"51": &tls.KeyShareExtension{[]tls.KeyShare{
-		{Group: tls.CurveID(GreasePlaceholder), Data: []byte{0}},
+		{Group: tls.CurveID(greasePlaceholder), Data: []byte{0}},
 		{Group: tls.X25519},
 	}},
 	"13172": &tls.NPNExtension{},
