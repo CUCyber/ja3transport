@@ -3,7 +3,6 @@ package ja3client
 func ExampleNew() {
 	client, _ := New(Chrome_Auto)
 	client.Get("https://ja3er.com/json")
-
 }
 
 func ExampleNewWithString() {
