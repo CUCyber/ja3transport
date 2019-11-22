@@ -128,9 +128,13 @@ func stringToSpec(ja3 string) (*tls.ClientHelloSpec, error) {
 	version := tokens[0]
 	ciphers := strings.Split(tokens[1], "-")
 	extensions := strings.Split(tokens[2], "-")
+
 	curves := strings.Split(tokens[3], "-")
+	if len(curves) == 1 && curves[0] == "" {
+		curves = []string{}
+	}
+
 	pointFormats := strings.Split(tokens[4], "-")
-	// TODO: improve parsing
 	if len(pointFormats) == 1 && pointFormats[0] == "" {
 		pointFormats = []string{}
 	}
