@@ -24,7 +24,6 @@ func ExampleNewWithString() {
 }
 
 func ExampleNewTransport() {
-	// Must import the `github.com/refraction-networking/utls` package to create the Config object.
 	tr, _ := NewTransport("771-61-60-53,0-23-15,29,23,24,0")
 	client := &http.Client{Transport: tr}
 	client.Get("https://ja3er.com/json")
