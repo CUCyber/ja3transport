@@ -1,17 +1,17 @@
 package ja3transport_test
 
 import (
-	"fmt"
-	"io/ioutil"
+	"encoding/json"
+	"io"
 	"net/http"
-	"strings"
 	"testing"
 
 	. "github.com/CUCyber/ja3transport"
 	tls "github.com/refraction-networking/utls"
 )
 
-const JA3Sig string = "771,4865-4866-4867-49196-49195-49188-49187-49162-49161-52393-49200-49199-49192-49191-49172-49171-52392-157-156-61-60-53-47-49160-49170-10,65281-0-23-13-5-18-16-11-51-45-43-10-21,29-23-24-25,0"
+const DefaultJA3Sig string = "771,4865-4866-4867-49196-49195-49188-49187-49162-49161-52393-49200-49199-49192-49191-49172-49171-52392-157-156-61-60-53-47-49160-49170-10,65281-0-23-13-5-18-16-11-51-45-43-10-21,29-23-24-25,0"
+const JA3erURL = "https://ja3er.com/json"
 
 func ExampleNew() {
 	client, _ := New(SafariAuto)
@@ -40,64 +40,117 @@ func ExampleNewTransportWithConfig() {
 	client.Get("https://ja3er.com/json")
 }
 
-func TestNew(t *testing.T) {
-	client, err := NewWithString(JA3Sig)
+// Helpers
+
+func ConvertBodyToSig(r io.Reader) (string, string, error) {
+	result := struct {
+		JA3       string `json:"ja3"`
+		UserAgent string `json:"User-Agent"`
+	}{}
+
+	if err := json.NewDecoder(r).Decode(&result); err != nil {
+		return "", "", err
+	}
+
+	return result.JA3, result.UserAgent, nil
+}
+
+func CheckTransport(c *http.Client) (string, error) {
+	req, err := http.NewRequest("GET", JA3erURL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	ja3, _, err := ConvertBodyToSig(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return ja3, nil
+}
+
+func CheckTransportDefault(c *http.Client, t *testing.T) {
+	result, err := CheckTransport(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != DefaultJA3Sig {
+		t.Fail()
+	}
+}
+
+// Tests
+func TestNewWithString(t *testing.T) {
+	client, err := NewWithString(DefaultJA3Sig)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	resp, err := client.Get("https://ja3er.com/json")
+	resp, err := client.Get(JA3erURL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
 
-	dataB, err := ioutil.ReadAll(resp.Body)
+	ja3, _, err := ConvertBodyToSig(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := string(dataB)
-	fmt.Println(data)
+
+	if ja3 != DefaultJA3Sig {
+		t.Fail()
+	}
+}
+
+func TestNew_browser(t *testing.T) {
+	client, err := New(SafariAuto)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := client.Get(JA3erURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, ua, err := ConvertBodyToSig(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ua != SafariAuto.UserAgent {
+		t.Fail()
+	}
+}
+
+func TestNew_noextension(t *testing.T) {
+	target := "771,4865-4866-4867-49196-49195-49188-49187-49162-49161-52393-49200-49199-49192-49191-49172-49171-52392-157-156-61-60-53-47-49160-49170-10,65281-0-23-13-5-18-16-11-51-45-43-10-21-2,29-23-24-25,0"
+	_, err := NewWithString(target)
+	if _, ok := err.(ErrExtensionNotExist); !ok {
+		t.Fail()
+	}
 }
 
 func TestNewTransport(t *testing.T) {
-	tr, err := NewTransport(JA3Sig)
+	tr, err := NewTransport(DefaultJA3Sig)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client := &http.Client{Transport: tr}
-	resp, err := client.Get("https://ja3er.com/json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	dataB, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data := string(dataB)
-	if !strings.Contains(data, "6fa3244afc6bb6f9fad207b6b52af26b") {
-		t.Fail()
-	}
+	CheckTransportDefault(client, t)
 }
 
 func TestNewTransportWithConfig(t *testing.T) {
-	tr, err := NewTransport(JA3Sig)
+	tr, err := NewTransport(DefaultJA3Sig)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	client := &http.Client{Transport: tr}
-	resp, err := client.Get("https://ja3er.com/json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	dataB, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data := string(dataB)
-	if !strings.Contains(data, "6fa3244afc6bb6f9fad207b6b52af26b") {
-		t.Fail()
-	}
+	CheckTransportDefault(client, t)
 }

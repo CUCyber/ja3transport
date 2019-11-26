@@ -17,8 +17,11 @@ import (
 const greasePlaceholder = 0x0a0a
 
 // ErrExtensionNotExist is returned when an extension is not supported by the library
-func ErrExtensionNotExist(e string) error {
-	return fmt.Errorf("Extension does not exist: %v\n", e)
+type ErrExtensionNotExist string
+
+// Error is the error value which contains the extension that does not exist
+func (e ErrExtensionNotExist) Error() string {
+	return fmt.Sprintf("Extension does not exist: %s\n", e)
 }
 
 // extMap maps extension values to the TLSExtension object associated with the
@@ -64,10 +67,7 @@ var extMap = map[string]tls.TLSExtension{
 	"45": &tls.PSKKeyExchangeModesExtension{[]uint8{
 		tls.PskModeDHE,
 	}},
-	"51": &tls.KeyShareExtension{[]tls.KeyShare{
-		{Group: tls.CurveID(greasePlaceholder), Data: []byte{0}},
-		{Group: tls.X25519},
-	}},
+	"51":    &tls.KeyShareExtension{[]tls.KeyShare{}},
 	"13172": &tls.NPNExtension{},
 	"65281": &tls.RenegotiationInfoExtension{
 		Renegotiation: tls.RenegotiateOnceAsClient,
