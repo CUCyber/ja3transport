@@ -27,6 +27,17 @@ func New(b Browser) (*JA3Client, error) {
 	return client, nil
 }
 
+// New creates a JA3Client based on a Browser struct
+// The transport allows an insecure TLS connection by setting InsecureSkipVerify to true
+func NewInsecure(b Browser) (*JA3Client, error) {
+	client, err := NewWithStringInsecure(b.JA3)
+	if err != nil {
+		return nil, err
+	}
+	client.Browser = b
+	return client, nil
+}
+
 // NewWithString creates a JA3 client with the specified JA3 string
 func NewWithString(ja3 string) (*JA3Client, error) {
 	tr, err := NewTransport(ja3)
@@ -39,6 +50,24 @@ func NewWithString(ja3 string) (*JA3Client, error) {
 	return &JA3Client{
 		client,
 		&tls.Config{},
+		Browser{JA3: ja3},
+	}, nil
+}
+
+// NewWithString creates a JA3 client with the specified JA3 string
+// The transport allows an insecure TLS connection by setting InsecureSkipVerify to true
+// This is set in both the JA3 client and Config objects
+func NewWithStringInsecure(ja3 string) (*JA3Client, error) {
+	tr, err := NewTransportInsecure(ja3)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{Transport: tr}
+
+	return &JA3Client{
+		client,
+		&tls.Config{InsecureSkipVerify: true},
 		Browser{JA3: ja3},
 	}, nil
 }

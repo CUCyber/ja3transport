@@ -79,6 +79,12 @@ func NewTransport(ja3 string) (*http.Transport, error) {
 	return NewTransportWithConfig(ja3, &tls.Config{})
 }
 
+// NewTransport creates an http.Transport which mocks the given JA3 signature when HTTPS is used
+// The transport allows an insecure TLS connection by setting InsecureSkipVerify to true
+func NewTransportInsecure(ja3 string) (*http.Transport, error) {
+	return NewTransportWithConfig(ja3, &tls.Config{InsecureSkipVerify: true})
+}
+
 // NewTransportWithConfig creates an http.Transport object given a utls.Config
 func NewTransportWithConfig(ja3 string, config *tls.Config) (*http.Transport, error) {
 	spec, err := stringToSpec(ja3)
