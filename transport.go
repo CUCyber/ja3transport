@@ -21,7 +21,7 @@ type ErrExtensionNotExist string
 
 // Error is the error value which contains the extension that does not exist
 func (e ErrExtensionNotExist) Error() string {
-	return fmt.Sprintf("Extension does not exist: %s\n", e)
+	return fmt.Sprintf("Extension does not exist: %s\n", string(e))
 }
 
 // extMap maps extension values to the TLSExtension object associated with the
@@ -57,17 +57,18 @@ var extMap = map[string]tls.TLSExtension{
 	"27": &tls.FakeCertCompressionAlgsExtension{},
 	"28": &tls.FakeRecordSizeLimitExtension{},
 	"35": &tls.SessionTicketExtension{},
-	"43": &tls.SupportedVersionsExtension{[]uint16{
+	"43": &tls.SupportedVersionsExtension{Versions: []uint16{
 		tls.GREASE_PLACEHOLDER,
 		tls.VersionTLS13,
 		tls.VersionTLS12,
 		tls.VersionTLS11,
 		tls.VersionTLS10}},
 	"44": &tls.CookieExtension{},
-	"45": &tls.PSKKeyExchangeModesExtension{[]uint8{
-		tls.PskModeDHE,
-	}},
-	"51":    &tls.KeyShareExtension{[]tls.KeyShare{}},
+	"45": &tls.PSKKeyExchangeModesExtension{
+		Modes: []uint8{
+			tls.PskModeDHE,
+		}},
+	"51":    &tls.KeyShareExtension{KeyShares: []tls.KeyShare{}},
 	"13172": &tls.NPNExtension{},
 	"65281": &tls.RenegotiationInfoExtension{
 		Renegotiation: tls.RenegotiateOnceAsClient,
@@ -94,14 +95,14 @@ func NewTransportWithConfig(ja3 string, config *tls.Config) (*http.Transport, er
 
 		config.ServerName = strings.Split(addr, ":")[0]
 
-		uTlsConn := tls.UClient(dialConn, config, tls.HelloCustom)
-		if err := uTlsConn.ApplyPreset(spec); err != nil {
+		uTLSConn := tls.UClient(dialConn, config, tls.HelloCustom)
+		if err := uTLSConn.ApplyPreset(spec); err != nil {
 			return nil, err
 		}
-		if err := uTlsConn.Handshake(); err != nil {
+		if err := uTLSConn.Handshake(); err != nil {
 			return nil, err
 		}
-		return uTlsConn, nil
+		return uTLSConn, nil
 	}
 
 	return &http.Transport{DialTLS: dialtls}, nil
@@ -132,7 +133,7 @@ func stringToSpec(ja3 string) (*tls.ClientHelloSpec, error) {
 		}
 		targetCurves = append(targetCurves, tls.CurveID(cid))
 	}
-	extMap["10"] = &tls.SupportedCurvesExtension{targetCurves}
+	extMap["10"] = &tls.SupportedCurvesExtension{Curves: targetCurves}
 
 	// parse point formats
 	var targetPointFormats []byte
