@@ -54,7 +54,7 @@ var extMap = map[string]tls.TLSExtension{
 	"18": &tls.SCTExtension{},
 	"21": &tls.UtlsPaddingExtension{GetPaddingLen: tls.BoringPaddingStyle},
 	"23": &tls.UtlsExtendedMasterSecretExtension{},
-	"27": &tls.FakeCertCompressionAlgsExtension{},
+	//"27": &tls.FakeCertCompressionAlgsExtension{},
 	"28": &tls.FakeRecordSizeLimitExtension{},
 	"35": &tls.SessionTicketExtension{},
 	"43": &tls.SupportedVersionsExtension{Versions: []uint16{
