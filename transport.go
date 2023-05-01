@@ -29,50 +29,52 @@ func (e ErrExtensionNotExist) Error() string {
 // special way. For example, "10" is the SupportedCurves extension which is also
 // used to calculate the JA3 signature. These JA3-dependent values are applied
 // after the instantiation of the map.
-var extMap = map[string]tls.TLSExtension{
-	"0": &tls.SNIExtension{},
-	"5": &tls.StatusRequestExtension{},
-	// These are applied later
-	// "10": &tls.SupportedCurvesExtension{...}
-	// "11": &tls.SupportedPointsExtension{...}
-	"13": &tls.SignatureAlgorithmsExtension{
-		SupportedSignatureAlgorithms: []tls.SignatureScheme{
-			tls.ECDSAWithP256AndSHA256,
-			tls.PSSWithSHA256,
-			tls.PKCS1WithSHA256,
-			tls.ECDSAWithP384AndSHA384,
-			tls.PSSWithSHA384,
-			tls.PKCS1WithSHA384,
-			tls.PSSWithSHA512,
-			tls.PKCS1WithSHA512,
-			tls.PKCS1WithSHA1,
+func getExtMap() map[string]tls.TLSExtension {
+	return map[string]tls.TLSExtension{
+		"0": &tls.SNIExtension{},
+		"5": &tls.StatusRequestExtension{},
+		// These are applied later
+		// "10": &tls.SupportedCurvesExtension{...}
+		// "11": &tls.SupportedPointsExtension{...}
+		"13": &tls.SignatureAlgorithmsExtension{
+			SupportedSignatureAlgorithms: []tls.SignatureScheme{
+				tls.ECDSAWithP256AndSHA256,
+				tls.PSSWithSHA256,
+				tls.PKCS1WithSHA256,
+				tls.ECDSAWithP384AndSHA384,
+				tls.PSSWithSHA384,
+				tls.PKCS1WithSHA384,
+				tls.PSSWithSHA512,
+				tls.PKCS1WithSHA512,
+				tls.PKCS1WithSHA1,
+			},
 		},
-	},
-	"16": &tls.ALPNExtension{
-		AlpnProtocols: []string{"h2", "http/1.1"},
-	},
-	"18": &tls.SCTExtension{},
-	"21": &tls.UtlsPaddingExtension{GetPaddingLen: tls.BoringPaddingStyle},
-	"23": &tls.UtlsExtendedMasterSecretExtension{},
-	"27": &tls.FakeCertCompressionAlgsExtension{},
-	"28": &tls.FakeRecordSizeLimitExtension{},
-	"35": &tls.SessionTicketExtension{},
-	"43": &tls.SupportedVersionsExtension{Versions: []uint16{
-		tls.GREASE_PLACEHOLDER,
-		tls.VersionTLS13,
-		tls.VersionTLS12,
-		tls.VersionTLS11,
-		tls.VersionTLS10}},
-	"44": &tls.CookieExtension{},
-	"45": &tls.PSKKeyExchangeModesExtension{
-		Modes: []uint8{
-			tls.PskModeDHE,
-		}},
-	"51":    &tls.KeyShareExtension{KeyShares: []tls.KeyShare{}},
-	"13172": &tls.NPNExtension{},
-	"65281": &tls.RenegotiationInfoExtension{
-		Renegotiation: tls.RenegotiateOnceAsClient,
-	},
+		"16": &tls.ALPNExtension{
+			AlpnProtocols: []string{"h2", "http/1.1"},
+		},
+		"18": &tls.SCTExtension{},
+		"21": &tls.UtlsPaddingExtension{GetPaddingLen: tls.BoringPaddingStyle},
+		"23": &tls.UtlsExtendedMasterSecretExtension{},
+		"27": &tls.FakeCertCompressionAlgsExtension{},
+		"28": &tls.FakeRecordSizeLimitExtension{},
+		"35": &tls.SessionTicketExtension{},
+		"43": &tls.SupportedVersionsExtension{Versions: []uint16{
+			tls.GREASE_PLACEHOLDER,
+			tls.VersionTLS13,
+			tls.VersionTLS12,
+			tls.VersionTLS11,
+			tls.VersionTLS10}},
+		"44": &tls.CookieExtension{},
+		"45": &tls.PSKKeyExchangeModesExtension{
+			Modes: []uint8{
+				tls.PskModeDHE,
+			}},
+		"51":    &tls.KeyShareExtension{KeyShares: []tls.KeyShare{}},
+		"13172": &tls.NPNExtension{},
+		"65281": &tls.RenegotiationInfoExtension{
+			Renegotiation: tls.RenegotiateOnceAsClient,
+		},
+	}
 }
 
 // NewTransport creates an http.Transport which mocks the given JA3 signature when HTTPS is used
@@ -110,6 +112,7 @@ func NewTransportWithConfig(ja3 string, config *tls.Config) (*http.Transport, er
 
 // stringToSpec creates a ClientHelloSpec based on a JA3 string
 func stringToSpec(ja3 string) (*tls.ClientHelloSpec, error) {
+	thisExtMap := getExtMap()
 	tokens := strings.Split(ja3, ",")
 
 	version := tokens[0]
@@ -133,7 +136,7 @@ func stringToSpec(ja3 string) (*tls.ClientHelloSpec, error) {
 		}
 		targetCurves = append(targetCurves, tls.CurveID(cid))
 	}
-	extMap["10"] = &tls.SupportedCurvesExtension{Curves: targetCurves}
+	thisExtMap["10"] = &tls.SupportedCurvesExtension{Curves: targetCurves}
 
 	// parse point formats
 	var targetPointFormats []byte
@@ -144,12 +147,12 @@ func stringToSpec(ja3 string) (*tls.ClientHelloSpec, error) {
 		}
 		targetPointFormats = append(targetPointFormats, byte(pid))
 	}
-	extMap["11"] = &tls.SupportedPointsExtension{SupportedPoints: targetPointFormats}
+	thisExtMap["11"] = &tls.SupportedPointsExtension{SupportedPoints: targetPointFormats}
 
 	// build extenions list
 	var exts []tls.TLSExtension
 	for _, e := range extensions {
-		te, ok := extMap[e]
+		te, ok := thisExtMap[e]
 		if !ok {
 			return nil, ErrExtensionNotExist(e)
 		}
