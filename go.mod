@@ -6,4 +6,7 @@ replace github.com/refraction-networking/utls v1.3.2 => github.com/refraction-ne
 
 require github.com/refraction-networking/utls v1.3.2
 
-require golang.org/x/crypto v0.8.0 // indirect
+require (
+	golang.org/x/crypto v0.9.0 // indirect
+	golang.org/x/sys v0.8.0 // indirect
+)
