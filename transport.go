@@ -30,6 +30,7 @@ func (e ErrExtensionNotExist) Error() string {
 // used to calculate the JA3 signature. These JA3-dependent values are applied
 // after the instantiation of the map.
 func getExtMap() map[string]tls.TLSExtension {
+
 	return map[string]tls.TLSExtension{
 		"0": &tls.SNIExtension{},
 		"5": &tls.StatusRequestExtension{},
@@ -55,7 +56,7 @@ func getExtMap() map[string]tls.TLSExtension {
 		"18": &tls.SCTExtension{},
 		"21": &tls.UtlsPaddingExtension{GetPaddingLen: tls.BoringPaddingStyle},
 		"23": &tls.UtlsExtendedMasterSecretExtension{},
-		"27": &tls.FakeCertCompressionAlgsExtension{},
+		//"27": &tls.FakeCertCompressionAlgsExtension{},
 		"28": &tls.FakeRecordSizeLimitExtension{},
 		"35": &tls.SessionTicketExtension{},
 		"43": &tls.SupportedVersionsExtension{Versions: []uint16{
